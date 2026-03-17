@@ -10,7 +10,7 @@ M.config = {
   }
 }
 
--- 🔌 API ---------------------------------------------------------------------
+-- API ---------------------------------------------------------------------
 
 --- Search DEVONthink using the x-devonthink:// scheme (Opens the App)
 function M.search(query)
@@ -19,30 +19,31 @@ function M.search(query)
   end
 
   if query and query ~= "" then
-    local escaped_query = vim.fn.escape(query, ' ')
-    local url = "x-devonthink://search?query=" .. escaped_query
-    vim.fn.system("open '" .. url .. "'")
+    local url = "x-devonthink://search?query=" .. query
+    vim.fn.system({ "open", url })
   end
 end
 
 --- Internal function to query DEVONthink via AppleScript
 local function query_devonthink(query)
   local script = [[
-    tell application id "DNtp"
-      set theResults to search "]] .. query .. [["
-      set out to ""
-      repeat with theRecord in theResults
-        set theName to name of theRecord
-        set thePath to path of theRecord
-        if thePath is not "" then
-          set out to out & theName & "::" & thePath & "\n"
-        end if
-      end repeat
-      return out
-    end tell
+    on run argv
+      tell application id "DNtp"
+        set theResults to search (item 1 of argv)
+        set out to ""
+        repeat with theRecord in theResults
+          set theName to name of theRecord
+          set thePath to path of theRecord
+          if thePath is not "" then
+            set out to out & theName & "::" & thePath & "\n"
+          end if
+        end repeat
+        return out
+      end tell
+    end run
   ]]
-  
-  local output = vim.fn.system("osascript -e '" .. script .. "'")
+
+  local output = vim.fn.system({ "osascript", "-e", script, "--", query })
   local lines = {}
   for line in output:gmatch("[^\r\n]+") do
     local name, path = line:match("^(.*)::(.*)$")
@@ -55,7 +56,7 @@ end
 
 --- Search DEVONthink and show results in Telescope
 function M.telescope_search()
-  local has_telescope, telescope = pcall(require, "telescope")
+  local has_telescope, _ = pcall(require, "telescope")
   if not has_telescope then
     print("Telescope is required for this feature.")
     return
@@ -117,7 +118,7 @@ function M.write_to_inbox()
   print("Written to DEVONthink Inbox: " .. filename)
 end
 
--- 🛠️ Internals ---------------------------------------------------------------
+-- Internals ---------------------------------------------------------------
 
 local function create_commands()
   vim.api.nvim_create_user_command('DTSearch', function(args)
@@ -146,7 +147,7 @@ local function apply_mappings()
   end
 end
 
--- 🏗️ Initialization ----------------------------------------------------------
+-- Initialization ----------------------------------------------------------
 
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})

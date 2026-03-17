@@ -1,4 +1,4 @@
--- Open selected DEVONthink records in Neovim (iTerm2)
+-- Open selected DEVONthink records in Neovim
 tell application id "DNtp"
     try
         set theSelection to the selection

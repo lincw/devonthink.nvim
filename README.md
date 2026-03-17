@@ -73,6 +73,12 @@ To open files from DEVONthink directly in your Neovim instance:
 
 The goal of this plugin is to treat DEVONthink as a powerful backend for document management while using Neovim as the primary interface for editing and searching. By leveraging DEVONthink's AppleScript API, we can fetch results directly into Neovim, providing a distraction-free workflow.
 
+## 🔄 Updates
+
+To update the plugin:
+- If installed via `lazy.nvim`, run `:Lazy update`.
+- If you are developing locally, restart Neovim to clear the Lua cache and load your latest changes.
+
 ## 📄 License
 
 MIT
