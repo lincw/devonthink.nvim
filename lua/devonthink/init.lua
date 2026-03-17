@@ -6,6 +6,7 @@ M.config = {
   mappings = {
     search = "<leader>ds", -- Open search in DEVONthink app
     find = "<leader>df",   -- Search DEVONthink inside Neovim (Telescope)
+    open = "<leader>dl",   -- Open DEVONthink link in Neovim
     inbox = "<leader>di",
   }
 }
@@ -22,6 +23,56 @@ function M.search(query)
     local url = "x-devonthink://search?query=" .. query
     vim.fn.system({ "open", url })
   end
+end
+
+--- Resolve a DEVONthink link/UUID to a path and open it in Neovim
+--- @param link string The x-devonthink-item:// link or UUID
+--- @param cmd? string The vim command to use (default: edit)
+function M.open_link(link, cmd)
+  cmd = cmd or "edit"
+  if not link or link == "" then
+    link = vim.fn.input('DEVONthink Link/UUID: ')
+  end
+  if link == "" then return end
+
+  local script = [[
+    on run argv
+      tell application id "DNtp"
+        set theRecord to get record with uuid (item 1 of argv)
+        if theRecord is not missing value then
+          return path of theRecord
+        end if
+      end tell
+      return ""
+    end run
+  ]]
+
+  local path = vim.fn.system({ "osascript", "-e", script, "--", link }):gsub("%s+$", "")
+  
+  if path ~= "" then
+    vim.cmd(cmd .. " " .. vim.fn.fnameescape(path))
+  else
+    print("DEVONthink record not found or has no file path.")
+  end
+end
+
+--- Handle mouse click on a DEVONthink link
+function M.handle_click()
+  local line = vim.api.nvim_get_current_line()
+  local col = vim.api.nvim_win_get_cursor(0)[2] + 1
+  
+  -- Find the link under the cursor
+  local start_idx, end_idx, link = line:find("(x%-devonthink%-item://[%w%-]+)", 1)
+  while start_idx do
+    if col >= start_idx and col <= end_idx then
+      M.open_link(link, "tabedit")
+      return
+    end
+    start_idx, end_idx, link = line:find("(x%-devonthink%-item://[%w%-]+)", end_idx + 1)
+  end
+  
+  -- If no link found, perform default click behavior (move cursor)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<LeftMouse>", true, false, true), "n", true)
 end
 
 --- Internal function to query DEVONthink via AppleScript
@@ -129,6 +180,10 @@ local function create_commands()
     M.telescope_search()
   end, { desc = 'Search DEVONthink (In Neovim)' })
 
+  vim.api.nvim_create_user_command('DTOpen', function(args)
+    M.open_link(args.args)
+  end, { nargs = '?', desc = 'Open DEVONthink link in Neovim' })
+
   vim.api.nvim_create_user_command('DTInbox', function()
     M.write_to_inbox()
   end, { desc = 'Write to DEVONthink Inbox' })
@@ -142,9 +197,15 @@ local function apply_mappings()
   if maps.find then
     vim.keymap.set('n', maps.find, function() M.telescope_search() end, { desc = 'Search DEVONthink (Neovim)' })
   end
+  if maps.open then
+    vim.keymap.set('n', maps.open, function() M.open_link() end, { desc = 'Open DEVONthink link in Neovim' })
+  end
   if maps.inbox then
     vim.keymap.set('n', maps.inbox, function() M.write_to_inbox() end, { desc = 'Write to DEVONthink Inbox' })
   end
+  
+  -- Mouse click mapping
+  vim.keymap.set('n', '<LeftMouse>', function() M.handle_click() end, { desc = 'Open DEVONthink link on click' })
 end
 
 -- Initialization ----------------------------------------------------------

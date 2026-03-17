@@ -32,6 +32,7 @@ require("devonthink").setup({
   mappings = {
     search = "<leader>ds", -- Open search in DEVONthink app
     find   = "<leader>df", -- Search DEVONthink inside Neovim (Telescope)
+    open   = "<leader>dl", -- Open DEVONthink link in Neovim
     inbox  = "<leader>di", -- Save current buffer to Inbox
   }
 })
@@ -44,14 +45,22 @@ require("devonthink").setup({
 | Command | Description |
 | :--- | :--- |
 | `:DTFind` | **Search DEVONthink inside Neovim** (via Telescope). |
+| `:DTOpen <link>`| **Open a DEVONthink link/UUID** directly in a Neovim buffer. |
 | `:DTSearch <query>` | Open DEVONthink app and search for the given query. |
 | `:DTInbox` | Save the current buffer to the DEVONthink Global Inbox. |
 
 ### Default Mappings
 
 - `<leader>df`: **Search DEVONthink from Neovim.** Shows a list of matching files in Telescope.
+- `<leader>dl`: **Open DEVONthink link/UUID.** Prompts for a link to open in Neovim.
 - `<leader>ds`: Prompt for a search query and open results in the DEVONthink app.
 - `<leader>di`: Save current file to DEVONthink Inbox.
+
+### Handling Links
+
+- **In-Neovim Editing**: Use `:DTOpen x-devonthink-item://...` to resolve a link to its local file path and open it in Neovim.
+- **Mouse Support**: Clicking on an `x-devonthink-item://` link with your mouse will automatically open that record in a new Neovim tab.
+- **Jump to App**: Neovim's native `gx` command will work on `x-devonthink://` links to open the record in the DEVONthink application.
 
 ### DEVONthink Integration ("Open in Neovim")
 
