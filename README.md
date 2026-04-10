@@ -2,92 +2,101 @@
 
 A lightweight Neovim plugin to bridge the gap between DEVONthink and Neovim on macOS.
 
-## 📥 Installation
+## Installation
 
 ### [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
 {
   "lincw/devonthink.nvim",
-  dependencies = { 
+  dependencies = {
     "nvim-telescope/telescope.nvim",
-    "nvim-lua/plenary.nvim" 
+    "nvim-lua/plenary.nvim",
   },
   config = function()
     require("devonthink").setup()
-  end
+  end,
 }
 ```
 
-## ⚙️ Configuration
-
-### Default Configuration
+## Configuration
 
 ```lua
 require("devonthink").setup({
   -- Path to the DEVONthink Global Inbox
   inbox_path = "~/Library/Application Support/DEVONthink/Inbox/",
 
-  -- Default mappings (set to nil to disable)
+  -- Default mappings (set any to nil to disable)
   mappings = {
-    search = "<leader>ds", -- Open search in DEVONthink app
-    find   = "<leader>df", -- Search DEVONthink inside Neovim (Telescope)
-    open   = "<leader>dl", -- Open DEVONthink link in Neovim
-    inbox  = "<leader>di", -- Save current buffer to Inbox
+    search    = "<leader>ds", -- Open search in DEVONthink app
+    find      = "<leader>df", -- Search DEVONthink inside Neovim (Telescope)
+    open      = "<leader>dl", -- Open a DEVONthink link in Neovim
+    inbox     = "<leader>di", -- Save current buffer to Inbox
+    copy_link = "<leader>dc", -- Search and copy an item link to clipboard
   }
 })
 ```
 
-## 🚀 Usage
+## Usage
 
 ### Commands
 
 | Command | Description |
 | :--- | :--- |
-| `:DTFind` | **Search DEVONthink inside Neovim** (via Telescope). |
-| `:DTOpen <link>`| **Open a DEVONthink link/UUID** directly in a Neovim buffer. |
-| `:DTSearch <query>` | Open DEVONthink app and search for the given query. |
+| `:DTFind` | Search DEVONthink inside Neovim via Telescope. |
+| `:DTOpen [link]` | Open a DEVONthink link or UUID in a Neovim buffer. |
+| `:DTSearch [query]` | Open the DEVONthink app and run a search. |
 | `:DTInbox` | Save the current buffer to the DEVONthink Global Inbox. |
+| `:DTCopyLink <UUID>` | Copy a known UUID as an `x-devonthink-item://` link to clipboard. |
 
 ### Default Mappings
 
-- `<leader>df`: **Search DEVONthink from Neovim.** Shows a list of matching files in Telescope.
-- `<leader>dl`: **Open DEVONthink link/UUID.** Prompts for a link to open in Neovim.
-- `<leader>ds`: Prompt for a search query and open results in the DEVONthink app.
-- `<leader>di`: Save current file to DEVONthink Inbox.
+| Mapping | Description |
+| :--- | :--- |
+| `<leader>df` | Search DEVONthink from Neovim (Telescope picker). |
+| `<leader>dc` | Search DEVONthink and copy the selected item link. |
+| `<leader>dl` | Prompt for a link/UUID and open it in Neovim. |
+| `<leader>ds` | Open DEVONthink app with a search query. |
+| `<leader>di` | Save current buffer to DEVONthink Inbox. |
+
+### Telescope Picker Actions
+
+When the Telescope picker is open (`:DTFind` / `<leader>df`):
+
+| Key | Action |
+| :--- | :--- |
+| `<CR>` | Open the selected record in Neovim. |
+| `<C-y>` | Copy the item's `x-devonthink-item://` link to clipboard. |
+| `<C-g>` | Insert `[name](x-devonthink-item://UUID)` at the cursor position. |
+
+**Copy link workflow:**
+1. `<leader>df` — open the Telescope search picker
+2. Type your query, navigate to the item
+3. `<C-y>` — copies the link and closes the picker
+4. `p` — paste the link wherever you need it
 
 ### Handling Links
 
-- **In-Neovim Editing**: Use `:DTOpen x-devonthink-item://...` to resolve a link to its local file path and open it in Neovim.
-- **Mouse Support**: Clicking on an `x-devonthink-item://` link with your mouse will automatically open that record in a new Neovim tab.
-- **Jump to App**: Neovim's native `gx` command will work on `x-devonthink://` links to open the record in the DEVONthink application.
+- **Open a link**: `:DTOpen x-devonthink-item://UUID` resolves the UUID to a local file path and opens it in Neovim.
+- **Mouse click**: Clicking on an `x-devonthink-item://` link opens that record in a new Neovim tab.
+- **Jump to app**: Neovim's `gx` on an `x-devonthink://` link opens the record in the DEVONthink app.
 
-### DEVONthink Integration ("Open in Neovim")
+### DEVONthink → Neovim ("Open in Neovim" script)
 
-To open files from DEVONthink directly in your Neovim instance:
+To open records from DEVONthink directly into your Neovim instance:
 
 1. Open `scripts/Open in Neovim.applescript` from this repository.
-2. In DEVONthink, go to the **Scripts menu** (icon in the menu bar) > **Open Scripts Folder**.
-3. Save the script as `Open in Neovim.scpt`.
-4. Now you can select any record in DEVONthink and run this script to open it in Neovim.
+2. In DEVONthink, go to **Scripts menu** > **Open Scripts Folder**.
+3. Save the script there as `Open in Neovim.scpt`.
+4. Select any record in DEVONthink and run the script to open it in Neovim.
 
-## 📋 Requirements
+## Requirements
 
-- **OS:** macOS
-- **App:** DEVONthink 3
-- **Neovim Plugin:** `telescope.nvim` (required for `:DTFind`)
-- **Terminal:** iTerm2 (default for the AppleScript)
+- macOS
+- DEVONthink 3
+- Neovim with `telescope.nvim` (required for `:DTFind`)
+- iTerm2 (default for the "Open in Neovim" AppleScript; change to `Terminal` if needed)
 
-## 💡 Idea
-
-The goal of this plugin is to treat DEVONthink as a powerful backend for document management while using Neovim as the primary interface for editing and searching. By leveraging DEVONthink's AppleScript API, we can fetch results directly into Neovim, providing a distraction-free workflow.
-
-## 🔄 Updates
-
-To update the plugin:
-- If installed via `lazy.nvim`, run `:Lazy update`.
-- If you are developing locally, restart Neovim to clear the Lua cache and load your latest changes.
-
-## 📄 License
+## License
 
 MIT

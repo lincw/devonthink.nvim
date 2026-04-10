@@ -8,6 +8,7 @@ M.config = {
     find = "<leader>df",   -- Search DEVONthink inside Neovim (Telescope)
     open = "<leader>dl",   -- Open DEVONthink link in Neovim
     inbox = "<leader>di",
+    copy_link = "<leader>dc", -- Search and copy item link to clipboard
   }
 }
 
@@ -77,16 +78,20 @@ end
 
 --- Internal function to query DEVONthink via AppleScript
 local function query_devonthink(query)
+  -- Use ASCII character 9 (real tab byte) as delimiter.
+  -- AppleScript's `tab` constant outputs the literal string "tab" via osascript, not a tab byte.
   local script = [[
     on run argv
       tell application id "DNtp"
         set theResults to search (item 1 of argv)
+        set sep to (ASCII character 9)
         set out to ""
         repeat with theRecord in theResults
           set theName to name of theRecord
           set thePath to path of theRecord
+          set theUUID to uuid of theRecord
           if thePath is not "" then
-            set out to out & theName & "::" & thePath & "\n"
+            set out to out & theUUID & sep & theName & sep & thePath & "\n"
           end if
         end repeat
         return out
@@ -97,12 +102,44 @@ local function query_devonthink(query)
   local output = vim.fn.system({ "osascript", "-e", script, "--", query })
   local lines = {}
   for line in output:gmatch("[^\r\n]+") do
-    local name, path = line:match("^(.*)::(.*)$")
-    if name and path then
-      table.insert(lines, { name = name, path = path })
+    -- UUID is first (no tabs in UUIDs), then name, then path (path may contain tabs on exotic setups but is last)
+    local uuid, name, path = line:match("^([^\t]+)\t([^\t]+)\t(.+)$")
+    if uuid and name and path then
+      table.insert(lines, { name = name, path = path, uuid = uuid })
     end
   end
   return lines
+end
+
+--- Copy a DEVONthink item link to the system clipboard
+--- @param uuid string The record UUID
+--- @param name? string Optional record name (used when inserting formatted link)
+function M.copy_link(uuid, name)
+  local link = "x-devonthink-item://" .. uuid
+  -- Pipe directly to pbcopy for guaranteed system clipboard access on macOS.
+  -- setreg alone is unreliable when called during Telescope teardown.
+  vim.fn.system({ "pbcopy" }, link)
+  -- Defer Vim register writes until after Telescope has fully closed,
+  -- otherwise its async teardown overwrites them.
+  vim.schedule(function()
+    vim.fn.setreg('"', link) -- unnamed register → p
+    vim.fn.setreg("0", link) -- yank register   → "0p
+    print("Copied: " .. link)
+  end)
+end
+
+--- Insert a DEVONthink item link at the current cursor position
+--- Format: [name](x-devonthink-item://UUID)
+--- @param uuid string The record UUID
+--- @param name string The record name
+function M.insert_link(uuid, name)
+  local link = "x-devonthink-item://" .. uuid
+  local formatted = "[" .. name .. "](" .. link .. ")"
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local line = vim.api.nvim_get_current_line()
+  local new_line = line:sub(1, col) .. formatted .. line:sub(col + 1)
+  vim.api.nvim_set_current_line(new_line)
+  vim.api.nvim_win_set_cursor(0, { row, col + #formatted })
 end
 
 --- Search DEVONthink and show results in Telescope
@@ -129,7 +166,7 @@ function M.telescope_search()
   end
 
   pickers.new({}, {
-    prompt_title = "DEVONthink Results: " .. query,
+    prompt_title = "DEVONthink: " .. query .. "  [<CR> open | <C-y> copy link | <C-g> insert link]",
     finder = finders.new_table {
       results = results,
       entry_maker = function(entry)
@@ -148,6 +185,33 @@ function M.telescope_search()
         actions.close(prompt_bufnr)
         local selection = action_state.get_selected_entry()
         vim.cmd("edit " .. vim.fn.fnameescape(selection.path))
+      end)
+      -- <C-y>: copy x-devonthink-item:// link to clipboard (y = yank)
+      map("i", "<C-y>", function()
+        local selection = action_state.get_selected_entry()
+        local uuid = selection.value.uuid
+        local name = selection.value.name
+        actions.close(prompt_bufnr)
+        M.copy_link(uuid, name)
+      end)
+      map("n", "<C-y>", function()
+        local selection = action_state.get_selected_entry()
+        local uuid = selection.value.uuid
+        local name = selection.value.name
+        actions.close(prompt_bufnr)
+        M.copy_link(uuid, name)
+      end)
+      -- <C-g>: insert [name](x-devonthink-item://UUID) at cursor
+      -- (<C-s> is intercepted by terminals as XOFF and never reaches Neovim)
+      map("i", "<C-g>", function()
+        local selection = action_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        M.insert_link(selection.value.uuid, selection.value.name)
+      end)
+      map("n", "<C-g>", function()
+        local selection = action_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        M.insert_link(selection.value.uuid, selection.value.name)
       end)
       return true
     end,
@@ -187,6 +251,10 @@ local function create_commands()
   vim.api.nvim_create_user_command('DTInbox', function()
     M.write_to_inbox()
   end, { desc = 'Write to DEVONthink Inbox' })
+
+  vim.api.nvim_create_user_command('DTCopyLink', function(args)
+    M.copy_link(args.args)
+  end, { nargs = 1, desc = 'Copy DEVONthink item link (UUID) to clipboard' })
 end
 
 local function apply_mappings()
@@ -202,6 +270,12 @@ local function apply_mappings()
   end
   if maps.inbox then
     vim.keymap.set('n', maps.inbox, function() M.write_to_inbox() end, { desc = 'Write to DEVONthink Inbox' })
+  end
+  if maps.copy_link then
+    vim.keymap.set('n', maps.copy_link, function()
+      -- Re-use telescope_search but focused on copy action
+      M.telescope_search()
+    end, { desc = 'Search DEVONthink and copy item link' })
   end
   
   -- Mouse click mapping

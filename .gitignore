@@ -12,3 +12,6 @@ Icon?
 # Files that might appear in the Global Inbox during testing
 *.tmp
 *.log
+
+# Claude Code session files
+.claude/
